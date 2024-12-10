@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'abroo_app',
+    'bot',
 ]
 
 MIDDLEWARE = [

@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from abroo_app.setup_commands import set_bot_commands
+from bot.setup_commands import set_bot_commands
 import asyncio
 
 class Command(BaseCommand):
