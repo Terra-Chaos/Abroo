@@ -1,5 +1,5 @@
 
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (CommandHandler,
                           ConversationHandler,
                           MessageHandler,
@@ -11,7 +11,7 @@ from bot.handlers.utils import *
 from bot.services import get_or_create_user_profile
 
 # The states in the conversation
-BANK_INFO, CONFIRM_BANK_INFO = range(2)
+BANK_INFO, CONFIRM_BANK_INFO, LOAN_AMOUNT, CONFIRM_AMOUNT, REPAYMENT_MONTHS = range(2)
 
 
 async def start_borrower_flow(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -66,11 +66,73 @@ async def confirm_bank_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(
             _('Thank you! How much money do you want to borrow?')
         )
+        to_return =  LOAN_AMOUNT
+    elif user_response == _('Change'):
+        await message.reply_text(
+            _('Please provide the correct info:'),
+            reply_markup=ReplyKeyboardRemove()
+        )
+        to_return = BANK_INFO
 
+    else:
+        await message.reply_text(
+            _('Please choose an option.')
+        )
+        to_return = CONFIRM_BANK_INFO
     
     await deactivate_user_language()    
-    # return ConversationHandler.END
+    return to_return
 
+
+async def received_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = await get_message(update)
+    user_input = message.text
+
+    amount = await parse_amount(user_input)
+    if amount is not None:
+        user_data = await get_user_data(context)
+        user_data['amount'] = amount
+        
+        reply_keyboard = [[_('Confirm'), _('Change')]]
+        await message.reply_text(_('''You entered:
+                                {loan_amount}
+                                Please confirm or change your input.
+                                ''').format(loan_amount=user_data['amount']),
+                                reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+        return CONFIRM_AMOUNT
+    else:
+        await message.reply_text(
+            _('Invalid amount. Please enter a numeric value for the amount you want to borrow.')
+        )
+        return LOAN_AMOUNT
+
+
+async def confirm_loan_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = await get_user(update)
+    await activate_user_language(user)
+
+    message = await get_message(update)
+    user_response = message.text
+
+    if user_response == _('Confirm'):
+        await message.reply_text(
+            _('Thank you! How many months will it take you to repay the loan?')
+        )
+        to_return = REPAYMENT_MONTHS
+    elif user_response == _('Change'):
+        await message.reply_text(
+            _('Please provide the correct amount:'),
+            reply_markup=ReplyKeyboardRemove()
+        )
+        to_return = LOAN_AMOUNT
+    else:
+        await message.reply_text(
+            _('Please choose an option.')
+        )
+        to_return = CONFIRM_AMOUNT
+    
+    await deactivate_user_language()    
+    return to_return
 
 
 
@@ -83,8 +145,17 @@ borrower_flow_handler = ConversationHandler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, received_bank_info)
         ],
         CONFIRM_BANK_INFO: [
-            MessageHandler(filters.TEXT, confirm_bank_info)
-        ]
+            MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_bank_info)
+        ],
+        LOAN_AMOUNT: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, received_amount)
+        ],
+        CONFIRM_AMOUNT: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, confirm_loan_amount)
+        ],
+        REPAYMENT_MONTHS: [
+            
+        ],
     },
 
     fallbacks=[],
